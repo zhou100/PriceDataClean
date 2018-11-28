@@ -25,11 +25,16 @@
 #################################################################
 
 rm(list=ls())
+
+
 library("readxl")
 library("tidyr")
 library("dplyr")
 library("openxlsx")
 library("zoo")
+
+
+source("R/function/reshapeDF.R")
 
 
 #################################################################
@@ -201,63 +206,26 @@ beans.df.new = price.dfs.list[[which(commodity.names=="BEANS_GENERAL")]]
 maize.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Maize",na = "NA")
 rice.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Polished Rice",na = "NA")
 nuts.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Groundnuts Shelled",na = "NA")
-beans.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Beans general",na = "NA")
+# beans first row is the date, don't read in column names 
+beans.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Beans general",na = "NA",col_names = FALSE)
 
 
-# create a function that formats the df and transpose them 
-reshapeDF = function(DF){
-  
-  temp.df = t(DF)  # transpose 
-  temp.df = as.data.frame(temp.df) 
-  rownames(temp.df)     = NULL
-  
-  colname.vector = as.character(unlist(temp.df[1, ]))
-  colnames(temp.df) = colname.vector # the first row will be the header
-  temp.df = temp.df[-1, ]          # removing the first row.
-  
-  date = as.integer( as.character(temp.df[["date"]])) # format date to integers 
-  
-  date = as.Date(date,origin="1900-01-01") # format date to dates  
-  
-  weeks = as.integer( as.character(temp.df[["week"]])) # format weeks to integers 
-  
-  #length(weeks)
-  #length(date)
-  
-  temp.df.numeric = as.matrix(temp.df[,3:ncol(temp.df)])
 
-  dim(temp.df.numeric)
-  for (j in 1:ncol(temp.df.numeric)){
-    for (i in 1:nrow(temp.df.numeric)){
-      temp.df.numeric[i,j] = as.numeric(temp.df.numeric[i,j])
-    }
-  }
-  dim(temp.df.numeric)
-  
-  trans.df = as.data.frame(temp.df.numeric)
-  trans.df["week"] = as.data.frame(weeks) # create week column
-  trans.df["date"] = as.data.frame(date) # create date column
-  trans.df["year"] = format(trans.df["date"],"%Y") # create year column
-  
-  
-  trans.df = trans.df %>%  
-             na.omit() %>% 
-             select(year,date, week,everything()) %>% 
-             select(-Average)
-  
-  trans.df[trans.df==0] = NA
-  return(trans.df) 
-}
+# source a function that formats the df and transpose them 
+source("R/function/reshapeDF.R")
 
-f= reshapeDF(maize.0815)
-
+# apply the reshape function on all the existing data 
 price.0815.list= list(maize.0815,rice.0815,nuts.0815,beans.0815)
+price.0815.pivot.list = lapply(price.0815.list, reshapeDF)
 
+maize.pivot= price.0815.pivot.list[[1]]
+dim(maize.pivot)
 
+# show that it's the same with the hand pivoted table 
 maize.0815.pivot = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "mkt_transpose",na = "NA")
 
 dim(maize.0815.pivot)
-dim(f)
+
 
 MAIZE_GRAIN <- read_csv("~/Box Sync/Research/Price_data_auto/merged/MAIZE_GRAIN.csv")
 colnames(MAIZE_GRAIN)[1]<-"date"
