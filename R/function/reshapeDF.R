@@ -5,25 +5,44 @@ library(dplyr)
 # and format date variable 
 
 ##################################################################
-reshapeDF = function(DF, date.var="date"){
+reshapeDF = function(DF, date.var="date",date.position=NULL){
   
-  if (is.na(DF[1,1])){
-    DF[1,1] = "date"
-  } else if(DF[1,1]=="MISUKU"){
-    colnames(DF)
-  } 
+  
+
   
   temp.df = t(DF)  # transpose 
   temp.df = as.data.frame(temp.df) 
-  rownames(temp.df)     = NULL
   
-  colname.vector = as.character(unlist(temp.df[1, ]))
-  colnames(temp.df) = colname.vector # the first row will be the header
+
+  
+
+  
+  colname.vector = as.character(unlist(temp.df[1,]))
+  colnames(temp.df) = colname.vector # the first row with the date information will be the header
   temp.df = temp.df[-1, ]          # removing the first row.
+
   
-  date = as.integer( as.character(temp.df[[date.var]])) # format date to integers 
+  if (date.position == "colnames" ){
+    
+  temp.df =  tibble::rownames_to_column(temp.df,var = "date")
+
+  date = temp.df[["date"]]
   
-  date = as.Date(date,origin="1900-01-01") # format date to dates  
+  temp.df= temp.df %>% dplyr::select (-date)
+  
+    
+  } else if (date.position == "row1" ){
+    
+    
+    rownames(temp.df)     = NULL
+    
+    date = as.integer( as.character(temp.df[[date.var]])) # format date to integers 
+    
+    date = as.Date(date,origin="1900-01-01") # format date to dates  
+    
+  }
+  
+  
   
   temp.df.numeric = as.matrix(temp.df)
   
@@ -42,8 +61,16 @@ reshapeDF = function(DF, date.var="date"){
   
   trans.df = trans.df %>%  
     filter(!is.na(date)) %>%
-    dplyr::select(date,year,month,everything()) %>% 
-    dplyr::select(-Average)
+    dplyr::select(date,year,month,everything())
+  
+  
+  tryCatch({
+    trans.df = trans.df %>% dplyr::select(-Average)
+  }, error = function(e){
+    
+  }
+    
+  )
   
   trans.df[trans.df==0] = NA
   

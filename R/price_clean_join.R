@@ -186,14 +186,33 @@ for ( FileIndex in 1:length(file.names)){
 
 
 
-# save some of the data into the 
+
+
+
+# save some of the data into dataframe 
 commodity.names
 
+
+ 
 maize.df.new = price.dfs.list[[which(commodity.names=="MAIZE_GRAIN")]]
 rice.df.new = price.dfs.list[[which(commodity.names=="POLISHED_RICE")]]
 nuts.df.new = price.dfs.list[[which(commodity.names=="SHELLED_G_NUTS")]]
 beans.df.new = price.dfs.list[[which(commodity.names=="BEANS_GENERAL")]]
 
+
+# source a function that formats the df and transpose them
+
+source("R/function/reshapeDF.R")
+
+new.dfs.list = list(maize.df.new,rice.df.new,nuts.df.new,beans.df.new)
+
+new.trans.dfs.list = lapply(new.dfs.list, function(x){reshapeDF(x,date.var="date",date.position="colnames")})
+
+
+maize.trans.df.new = new.trans.dfs.list[[1]]
+rice.trans.df.new = new.trans.dfs.list[[2]]
+nuts.trans.df.new = new.trans.dfs.list[[3]]
+beans.trans.df.new = new.trans.dfs.list[[4]]
 
 #################################################################
 ### 3. read old data and join the new processed data, by crop 
@@ -209,6 +228,36 @@ nuts.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Groundnut
 # beans first row is the date, don't read in column names 
 beans.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Beans general",na = "NA",col_names = FALSE)
 
+# need to format these into the same format as above. i.e. using date as column names 
+
+
+# first find where the date variable is, formatting into date and make it the colnames 
+# handle this with a if functions 
+# note that this is not the general case, depend on what your data looks like. 
+
+formatDF = function(DF){
+  
+  if (is.na(DF[1,1])){
+    DF[1,1] = "date"
+  }  
+
+  # remove the row with the week variable in maize 
+  
+  if (DF[2,1] = "week"){
+    DF = DF[-2,]
+  }
+  
+    
+}
+
+
+
+
+
+
+
+
+
 
 
 # source a function that formats the df and transpose them 
@@ -216,15 +265,28 @@ source("R/function/reshapeDF.R")
 
 # apply the reshape function on all the existing data 
 price.0815.list= list(maize.0815,rice.0815,nuts.0815,beans.0815)
-price.0815.pivot.list = lapply(price.0815.list, reshapeDF)
+price.0815.pivot.list = lapply(price.0815.list, function(x){reshapeDF(x,date.var="date",date.position="row1")})
 
 maize.pivot= price.0815.pivot.list[[1]]
 dim(maize.pivot)
 
 # show that it's the same with the hand pivoted table 
-maize.0815.pivot = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "mkt_transpose",na = "NA")
+# maize.0815.pivot = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "mkt_transpose",na = "NA")
+# 
+# dim(maize.0815.pivot)
 
-dim(maize.0815.pivot)
+
+
+
+maize.pivot
+
+
+
+
+
+
+
+
 
 
 MAIZE_GRAIN <- read_csv("~/Box Sync/Research/Price_data_auto/merged/MAIZE_GRAIN.csv")
