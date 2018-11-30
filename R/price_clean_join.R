@@ -34,11 +34,11 @@ library("openxlsx")
 library("zoo")
 
 
-source("R/function/reshapeDF.R")
+source("R/function/transposeDF.R")
 
 
 #################################################################
-### 1. read in the data and separate by commodity 
+### 1. read in the data 
 #################################################################
 # list the new price data files
 price.files.1516 <- list.files(path=paste("data/raw/","malawi.price.1516",sep="/"), 
@@ -84,8 +84,11 @@ list2env(
 
 # create a vector of length equal to the length of the commodity market
 
-price.dfs.list = vector(mode="list", length = 22) 
 
+##############################################################
+#   2. separate each file by commodity and save into separeate list 
+##############################################################
+price.dfs.list = vector(mode="list", length = 22) 
 
 for ( FileIndex in 1:length(file.names)){
   
@@ -184,142 +187,140 @@ for ( FileIndex in 1:length(file.names)){
 
 } # loop over different files  
 
-
-
-
-
-
 # save some of the data into dataframe 
 commodity.names
 
-
- 
 maize.df.new = price.dfs.list[[which(commodity.names=="MAIZE_GRAIN")]]
 rice.df.new = price.dfs.list[[which(commodity.names=="POLISHED_RICE")]]
 nuts.df.new = price.dfs.list[[which(commodity.names=="SHELLED_G_NUTS")]]
 beans.df.new = price.dfs.list[[which(commodity.names=="BEANS_GENERAL")]]
 
-
-# source a function that formats the df and transpose them
-
-source("R/function/reshapeDF.R")
-
-new.dfs.list = list(maize.df.new,rice.df.new,nuts.df.new,beans.df.new)
-
-new.trans.dfs.list = lapply(new.dfs.list, function(x){reshapeDF(x,date.var="date",date.position="colnames")})
+price.1617.formatted.list= list(maize.df.new,rice.df.new,nuts.df.new,beans.df.new)
 
 
-maize.trans.df.new = new.trans.dfs.list[[1]]
-rice.trans.df.new = new.trans.dfs.list[[2]]
-nuts.trans.df.new = new.trans.dfs.list[[3]]
-beans.trans.df.new = new.trans.dfs.list[[4]]
 
 #################################################################
-### 3. read old data and join the new processed data, by crop 
+### 3. read old data, reformat them and then join the new processed data for each crop by market 
 #################################################################
 
 # read in price data 0815, transpose them and ready them for merge with the new 
 
 # read in the previously hand cleaned data set from 08-15
 
-maize.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Maize",na = "NA")
-rice.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Polished Rice",na = "NA")
-nuts.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Groundnuts Shelled",na = "NA")
+maize.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Maize",na = "NA",col_types="guess")
+rice.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Polished Rice",na = "NA",col_types="guess")
+nuts.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Groundnuts Shelled",na = "NA",col_types="guess")
 # beans first row is the date, don't read in column names 
-beans.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Beans general",na = "NA",col_names = FALSE)
+beans.0815 = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "Beans general",na = "NA",col_names = FALSE,col_types="guess")
 
 # need to format these into the same format as above. i.e. using date as column names 
+# handle the formating with several if functions 
+# note that this is not the general case, depend on what your data looks like，you need to change the formatDF function 
 
 
-# first find where the date variable is, formatting into date and make it the colnames 
-# handle this with a if functions 
-# note that this is not the general case, depend on what your data looks like. 
+##############################################################
+# 4. Define a function to format the data frames 
+##############################################################
 
-formatDF = function(DF){
+formatDF = function(DF.raw){
+  
+  # fill in the name "date“ if missing 
+  DF = DF.raw
   
   if (is.na(DF[1,1])){
     DF[1,1] = "date"
   }  
-
-  # remove the row with the week variable in maize 
   
-  if (DF[2,1] = "week"){
+  # remove the row with the week variable in the maize table
+  
+  if (DF[2,1] == "week"){
     DF = DF[-2,]
   }
   
+    # 2.	format the date row
+  # first find where the date variable is, formatting into date and make it the colnames 
+  for (i in 2:ncol(DF)){
     
+    if (class(DF[[1,i]])=="POSIXct"){
+      
+      temp.val = as.character(DF[[1,i]])
+      colnames(DF)[i] = temp.val
+      
+
+    } else {
+      
+        if (is.na(DF[[1,i]]) & i > 1){
+          DF[[1,i]]= DF[[1,i-1]] + 7 
+        }
+    
+          temp.val = as.integer( as.character(DF[[1,i]]))
+          temp.val = as.Date(temp.val,origin="1900-01-01")
+          temp.val = as.character(temp.val)
+          colnames(DF)[i] = temp.val
+      }#else
+      
+  }# loop for column
+  
+   
+  
+  # 3.	remove the original date variable 
+  
+  DF = DF[-1,] #  
+  colnames(DF)[1]= "Market"  # make the Market as the column name
+  
+  return(DF)
 }
 
 
+price.0815.list= list(maize.0815,rice.0815,nuts.0815,beans.0815)
+
+price.0815.formatted.list= lapply(price.0815.list,formatDF)
+ 
+# price.0815.formatted.list
 
 
+# replace some misspells in the market names 
 
+for (i in 1:length(price.1617.formatted.list)){
 
+  price.1617.formatted.list[[i]][["Market"]] [which(price.1617.formatted.list[[i]][["Market"]]=="CHIKHWAWA")] = "CHIKWAWA"
+  price.1617.formatted.list[[i]][["Market"]] [which(price.1617.formatted.list[[i]][["Market"]]=="LUNCHEZA")] = "LUCHENZA"
+  
+}
 
+##############################################################
+# 5. join old and new data frame by market name
+##############################################################
+maize.join.df = dplyr::full_join(price.0815.formatted.list[[1]],price.1617.formatted.list[[1]],by = "Market")
+rice.join.df = dplyr::full_join(price.0815.formatted.list[[2]],price.1617.formatted.list[[2]],by = "Market")
+nuts.join.df = dplyr::full_join(price.0815.formatted.list[[3]],price.1617.formatted.list[[3]],by = "Market")
+beans.join.df = dplyr::full_join(price.0815.formatted.list[[4]],price.1617.formatted.list[[4]],by = "Market")
 
-
-
-
+##############################################################
+# 6. apply transposeDF
+##############################################################
 # source a function that formats the df and transpose them 
-source("R/function/reshapeDF.R")
+source("R/function/transposeDF.R")
 
 # apply the reshape function on all the existing data 
-price.0815.list= list(maize.0815,rice.0815,nuts.0815,beans.0815)
-price.0815.pivot.list = lapply(price.0815.list, function(x){reshapeDF(x,date.var="date",date.position="row1")})
+price.0817.list= list(maize.join.df,rice.join.df,nuts.join.df,beans.join.df)
+price.0817.pivot.list = lapply(price.0817.list, function(x){transposeDF(x,date.var="date",date.position="colnames")})
 
-maize.pivot= price.0815.pivot.list[[1]]
-dim(maize.pivot)
+maize.joined= price.0817.pivot.list[[1]]
+rice.joined= price.0817.pivot.list[[2]]
+nuts.joined= price.0817.pivot.list[[3]]
+beans.joined= price.0817.pivot.list[[4]]
 
 # show that it's the same with the hand pivoted table 
 # maize.0815.pivot = read_excel("data/raw/WeeklyPricesMaize_0815.xlsx",sheet = "mkt_transpose",na = "NA")
 # 
 # dim(maize.0815.pivot)
 
-
-
-
-maize.pivot
-
-
-
-
-
-
-
-
-
-
-MAIZE_GRAIN <- read_csv("~/Box Sync/Research/Price_data_auto/merged/MAIZE_GRAIN.csv")
-colnames(MAIZE_GRAIN)[1]<-"date"
-colnames(MAIZE_GRAIN)[which(colnames(MAIZE_GRAIN)=="CHIKHWAWA")]<-"CHIKWAWA"
-colnames(MAIZE_GRAIN)[which(colnames(MAIZE_GRAIN)=="LUNCHEZA")]<-"LUCHENZA"
-
- 
-WeeklyPricesMaize_join <- read_excel("~/Box Sync/Research/Price_data_auto/Market data/WeeklyPricesMaize_join.xlsx",sheet = "mkt_transpose",na = "empty")
-WeeklyPricesMaize_join <- WeeklyPricesMaize_join[,-which(colnames(WeeklyPricesMaize_join)=="Average")]
-MAIZE_GRAIN<-MAIZE_GRAIN[,-which(colnames(MAIZE_GRAIN)=="CHILINGA")]
-MAIZE_GRAIN$MIGOWI<-NA
-
-MAIZE_GRAIN[,4:ncol(MAIZE_GRAIN)]<-as.numeric(unlist(MAIZE_GRAIN[,4:ncol(MAIZE_GRAIN)]))
-MAIZE_GRAIN$date<-as.character(MAIZE_GRAIN$date) 
-MAIZE_GRAIN$week<-as.numeric(MAIZE_GRAIN$week) 
-
-WeeklyPricesMaize_join[,4:ncol(WeeklyPricesMaize_join)]<-as.numeric(unlist(WeeklyPricesMaize_join[,4:ncol(WeeklyPricesMaize_join)]))                                             
-WeeklyPricesMaize_join$date<-as.character(WeeklyPricesMaize_join$date)
-WeeklyPricesMaize_join$week<-as.numeric(WeeklyPricesMaize_join$week)
-
-
-newdata<-dplyr::setdiff(MAIZE_GRAIN,WeeklyPricesMaize_join)
-maize_joined<-dplyr::union(MAIZE_GRAIN,WeeklyPricesMaize_join)
-
-
-maize_joined$date<-as.Date(maize_joined$date)
-maize_joined<-maize_joined[order(maize_joined$date),] 
-
-
-
-
-
-
-write.csv(maize_joined,"maize_price_joined.csv") # write out in csv format 
-
+##############################################################
+# 7. write the data 
+############################################################## 
+dir.create("data/clean")
+write.csv(maize.joined,"data/clean/maize_joined_0817.csv") # write out in csv format 
+write.csv(rice.joined,"data/clean/rice_joined_0817.csv") # write out in csv format 
+write.csv(nuts.joined,"data/clean/nuts_joined_0817.csv") # write out in csv format 
+write.csv(beans.joined,"data/clean/beans_joined_0817.csv") # write out in csv format 

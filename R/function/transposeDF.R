@@ -3,20 +3,14 @@ library(dplyr)
 ##################################################################
 # Small function to transpose/pivot table
 # and format date variable 
-
 ##################################################################
-reshapeDF = function(DF, date.var="date",date.position=NULL){
+transposeDF = function(DF,date.var="date",date.position=NULL){
   
-  
-
   
   temp.df = t(DF)  # transpose 
   temp.df = as.data.frame(temp.df) 
   
 
-  
-
-  
   colname.vector = as.character(unlist(temp.df[1,]))
   colnames(temp.df) = colname.vector # the first row with the date information will be the header
   temp.df = temp.df[-1, ]          # removing the first row.
@@ -61,7 +55,7 @@ reshapeDF = function(DF, date.var="date",date.position=NULL){
   
   trans.df = trans.df %>%  
     filter(!is.na(date)) %>%
-    dplyr::select(date,year,month,everything())
+    dplyr::select(date,year,month,day,everything())
   
   
   tryCatch({
